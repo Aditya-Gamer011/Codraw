@@ -2,8 +2,19 @@
 
 import { useState } from "react";
 
-import { parseProject } from "@/lib/parseProject";
+import {
+  isValidProject,
+  parseProject,
+} from "@/lib/parseProject";
 import { useEditorStore } from "@/lib/editorStore";
+
+const modelOptions = [
+  { id: "lightning", label: "Lightning" },
+  { id: "balanced", label: "Balanced" },
+  { id: "hardcore", label: "Hardcore" },
+] as const;
+
+type ModelMode = (typeof modelOptions)[number]["id"];
 
 export default function AIPanel() {
   const files = useEditorStore((s) => s.files);
@@ -11,6 +22,8 @@ export default function AIPanel() {
 
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
+  const [modelMode, setModelMode] =
+    useState<ModelMode>("lightning");
 
   const suggestions = [
     "Modern SaaS landing page",
@@ -35,6 +48,7 @@ export default function AIPanel() {
         body: JSON.stringify({
           prompt,
           files,
+          modelMode,
         }),
       });
 
@@ -46,6 +60,14 @@ export default function AIPanel() {
       }
 
       const updatedFiles = parseProject(data.html);
+
+      if (!isValidProject(updatedFiles)) {
+        console.error("Invalid AI response:", data.html);
+        alert(
+          "The AI returned an invalid project. Please try again."
+        );
+        return;
+      }
 
       setFiles(updatedFiles);
 
@@ -59,14 +81,14 @@ export default function AIPanel() {
   }
 
   return (
-    <div className="flex h-full flex-col border-l border-neutral-800 bg-neutral-950">
-      <div className="border-b border-neutral-800 p-4">
+    <div className="ocean-glass flex h-full flex-col border-l text-cyan-50">
+      <div className="border-b border-cyan-200/15 p-4">
         <h2 className="text-lg font-semibold text-white">
           AI Assistant
         </h2>
 
-        <p className="mt-1 text-sm text-neutral-400">
-          Describe the website you'd like to build.
+        <p className="mt-1 text-sm text-cyan-100/62">
+          Describe the website you want to build.
         </p>
       </div>
 
@@ -75,7 +97,7 @@ export default function AIPanel() {
           <button
             key={suggestion}
             onClick={() => setPrompt(suggestion)}
-            className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300 transition hover:border-blue-500 hover:text-white"
+            className="ocean-button rounded-full border px-3 py-1 text-xs transition"
           >
             {suggestion}
           </button>
@@ -83,8 +105,26 @@ export default function AIPanel() {
       </div>
 
       <div className="flex flex-1 flex-col gap-4 p-4">
+        <div className="ocean-soft grid grid-cols-3 overflow-hidden rounded border p-1">
+          {modelOptions.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              disabled={loading}
+              onClick={() => setModelMode(option.id)}
+              className={`h-8 text-xs font-medium transition ${
+                modelMode === option.id
+                  ? "rounded bg-cyan-300 text-slate-950 shadow-[0_0_18px_rgba(34,211,238,.25)]"
+                  : "text-cyan-100/58 hover:text-white"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
         <textarea
-          className="flex-1 resize-none rounded-lg border border-neutral-700 bg-neutral-900 p-3 text-white outline-none transition focus:border-blue-500"
+          className="ocean-input flex-1 resize-none rounded-lg border p-3 outline-none transition"
           placeholder="Build me a modern landing page for an AI startup..."
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
@@ -93,7 +133,7 @@ export default function AIPanel() {
         <button
           onClick={generateWebsite}
           disabled={loading}
-          className="flex items-center justify-center rounded-lg bg-blue-600 py-3 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-700"
+          className="flex items-center justify-center rounded-lg border border-cyan-200/40 bg-cyan-400 py-3 font-medium text-slate-950 shadow-[0_0_26px_rgba(34,211,238,.22)] transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-700 disabled:text-slate-300"
         >
           {loading ? (
             <>

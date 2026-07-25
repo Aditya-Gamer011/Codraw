@@ -11,10 +11,10 @@ const defaultFiles: ProjectFiles = {
   <title>Preview</title>
 </head>
 <body>
-  <h1>Live Preview</h1>
-  <p>
-    Whatever you create in Codraw will appear here.
-  </p>
+  <main>
+    <h1>Preview</h1>
+    <p>Whatever you make will appear here.</p>
+  </main>
 </body>
 </html>`,
 
@@ -44,18 +44,7 @@ p {
   margin: 0;
 }`,
 
-  "script.js": `
-function updatePreview(newText) {
-  const p = document.querySelector('p');
-  if (p) {
-    p.textContent = newText;
-  }
-}
-window.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'UPDATE_PREVIEW') {
-    updatePreview(event.data.text);
-  }
-});`,
+  "script.js": ``,
 };
 
 interface EditorStore {

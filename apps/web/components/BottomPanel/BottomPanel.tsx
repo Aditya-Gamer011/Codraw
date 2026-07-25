@@ -1,5 +1,7 @@
 "use client";
 
+import { X } from "lucide-react";
+
 import CodeEditor from "./CodeEditor";
 import { useEditorStore } from "@/lib/editorStore";
 
@@ -10,29 +12,30 @@ export default function BottomPanel() {
   const closeTab = useEditorStore((s) => s.closeTab);
 
   return (
-    <div className="flex h-full flex-col bg-neutral-900">
-      <div className="flex border-b border-neutral-800 bg-neutral-950">
+    <div className="ocean-glass flex h-full flex-col border-t">
+      <div className="flex border-b border-cyan-200/15 bg-slate-950/35">
         {openTabs.map((file) => (
           <div
             key={file}
-            className={`flex items-center border-r border-neutral-800 ${
+            className={`flex items-center border-r border-cyan-200/15 ${
               selectedFile === file
-                ? "bg-neutral-900"
-                : ""
+                ? "bg-cyan-300/12 text-white"
+                : "text-cyan-100/68"
             }`}
           >
             <button
               onClick={() => openFile(file)}
-              className="px-4 py-2 text-sm"
+              className="px-4 py-2 text-sm transition hover:text-white"
             >
               {file}
             </button>
 
             <button
               onClick={() => closeTab(file)}
-              className="px-2 text-neutral-500 hover:text-red-400"
+              className="grid h-7 w-7 place-items-center text-cyan-100/40 transition hover:text-rose-300"
+              aria-label={`Close ${file}`}
             >
-              ×
+              <X size={14} />
             </button>
           </div>
         ))}

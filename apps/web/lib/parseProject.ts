@@ -4,25 +4,35 @@ export interface ProjectFiles {
   "script.js": string;
 }
 
+const fileHeaderPattern =
+  /^```[a-z]*\s*$|^===\s*(index\.html|style\.css|script\.js)\s*===\s*$/gim;
+
 export function parseProject(text: string): ProjectFiles {
-  const html =
-    text.match(
-      /=== index\.html ===([\s\S]*?)=== style\.css ===/
-    )?.[1]?.trim() ?? "";
-
-  const css =
-    text.match(
-      /=== style\.css ===([\s\S]*?)=== script\.js ===/
-    )?.[1]?.trim() ?? "";
-
-  const js =
-    text.match(
-      /=== script\.js ===([\s\S]*)/
-    )?.[1]?.trim() ?? "";
-
-  return {
-    "index.html": html,
-    "style.css": css,
-    "script.js": js,
+  const files: ProjectFiles = {
+    "index.html": "",
+    "style.css": "",
+    "script.js": "",
   };
+  const matches = Array.from(text.matchAll(fileHeaderPattern));
+
+  for (let index = 0; index < matches.length; index += 1) {
+    const fileName = matches[index][1] as keyof ProjectFiles | undefined;
+
+    if (!fileName) continue;
+
+    const start = matches[index].index! + matches[index][0].length;
+    const end = matches[index + 1]?.index ?? text.length;
+
+    files[fileName] = text
+      .slice(start, end)
+      .replace(/^```[a-z]*\s*/i, "")
+      .replace(/```\s*$/i, "")
+      .trim();
+  }
+
+  return files;
+}
+
+export function isValidProject(files: ProjectFiles) {
+  return files["index.html"].trim().length > 0;
 }

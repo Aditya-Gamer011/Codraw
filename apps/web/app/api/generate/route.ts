@@ -2,15 +2,115 @@ import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
 
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY!,
+  apiKey: process.env.GEMINI_API_KEY,
 });
+
+const modelByMode = {
+  lightning: "gemini-3.5-flash-lite",
+  balanced: "gemini-3.6-flash",
+  hardcore: "gemini-3.1-pro-preview",
+} as const;
+
+type ModelMode = keyof typeof modelByMode;
+
+const maxAttempts = 3;
+
+function getModel(mode: unknown) {
+  if (
+    typeof mode === "string" &&
+    mode in modelByMode
+  ) {
+    return modelByMode[mode as ModelMode];
+  }
+
+  return process.env.GEMINI_MODEL ?? modelByMode.lightning;
+}
+
+function isTransientError(error: unknown) {
+  const message =
+    error instanceof Error ? error.message : String(error);
+  const cause =
+    error instanceof Error && "cause" in error
+      ? String(error.cause)
+      : "";
+  const text = `${message} ${cause}`.toLowerCase();
+
+  return (
+    text.includes("fetch failed") ||
+    text.includes("econnreset") ||
+    text.includes("etimedout") ||
+    text.includes("temporarily unavailable") ||
+    text.includes("503") ||
+    text.includes("502") ||
+    text.includes("429")
+  );
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function generateWithRetry(
+  contents: string,
+  model: string
+) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await ai.models.generateContent({
+        model,
+        contents,
+      });
+    } catch (error) {
+      lastError = error;
+
+      if (
+        attempt === maxAttempts ||
+        !isTransientError(error)
+      ) {
+        throw error;
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, attempt * 750)
+      );
+    }
+  }
+
+  throw lastError;
+}
 
 export async function POST(req: Request) {
   try {
+    if (!process.env.GEMINI_API_KEY) {
+      return NextResponse.json(
+        {
+          error:
+            "Missing GEMINI_API_KEY. Add it to apps/web/.env.local and restart the dev server.",
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
     const body = await req.json();
 
     const prompt = body.prompt;
     const files = body.files;
+    const model = getModel(body.modelMode);
+
+    if (!prompt || !files) {
+      return NextResponse.json(
+        {
+          error: "Missing prompt or project files.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
     const project =
 `=== index.html ===
@@ -22,72 +122,26 @@ ${files["style.css"]}
 === script.js ===
 ${files["script.js"]}`;
 
-    const response = await ai.models.generateContent({
-      model: "models/gemini-3.5-flash",
-      contents: `
-You are an expert frontend engineer and award-winning UI/UX designer.
+    const response = await generateWithRetry(
+      `Edit this website.
 
-You are EDITING an existing website.
-
-The user already has a working project.
-
-Your job is to MODIFY it according to the user's request.
-
-Current Project:
-
+Current files:
 ${project}
 
-User Request:
-
+User request:
 ${prompt}
 
-Instructions:
-
-- Preserve everything unrelated to the user's request.
-- Only modify what is necessary.
-- Do NOT randomly redesign the whole website.
-- Keep the existing design language unless asked otherwise.
-- Do NOT remove existing features unless requested.
-- Return the COMPLETE updated project.
-
-Return EXACTLY three files.
-
+Return only these three complete files, with these exact headers:
 === index.html ===
 ...
-
 === style.css ===
 ...
-
 === script.js ===
 ...
 
-Rules:
-
-- Return ONLY these three files.
-- No markdown.
-- No \`\`\`.
-- index.html must link style.css.
-- index.html must load script.js.
-- Put all CSS in style.css.
-- Put all JavaScript in script.js.
-- Use semantic HTML.
-- Use only HTML, CSS and vanilla JavaScript.
-- No React.
-- No Tailwind.
-- No Bootstrap.
-- No jQuery.
-- No npm packages.
-- No external JS libraries.
-- No Font Awesome Kit URLs.
-- No placeholder API keys.
-- Do not reference local assets that do not exist.
-- If icons are needed, use inline SVG.
-- If images are needed, use https://images.unsplash.com/.
-- The project must work immediately by opening index.html.
-
-When the user asks for a small change, make ONLY that change while keeping everything else intact.
-`,
-    });
+Rules: preserve unrelated code, use only HTML/CSS/vanilla JS, no markdown, no extra text.`,
+      model
+    );
 
     return NextResponse.json({
       html: response.text,
@@ -97,7 +151,10 @@ When the user asks for a small change, make ONLY that change while keeping every
 
     return NextResponse.json(
       {
-        error: String(error),
+        error:
+          isTransientError(error)
+            ? "The AI provider connection was interrupted. Please try again in a moment."
+            : getErrorMessage(error),
       },
       {
         status: 500,
