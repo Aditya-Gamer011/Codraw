@@ -1,66 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { Group, Panel, Separator } from "react-resizable-panels";
 
-import Toolbar from "../components/Toolbar/Toolbar";
-import FileExplorer from "../components/FileExplorer/FileExplorer";
-import LiveCanvas from "../components/LiveCanvas/LiveCanvas";
-import AIPanel from "../components/AIPanel/AIPanel";
-import BottomPanel from "../components/BottomPanel/BottomPanel";
+import Toolbar from "@/components/Toolbar/Toolbar";
+import FileExplorer from "@/components/FileExplorer/FileExplorer";
+import LiveCanvas from "@/components/LiveCanvas/LiveCanvas";
+import AIPanel from "@/components/AIPanel/AIPanel";
+import BottomPanel from "@/components/BottomPanel/BottomPanel";
 
-const defaultHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-<style>
-body{
-    margin:0;
-    padding:40px;
-    font-family:Arial,sans-serif;
-    background:#111827;
-    color:white;
-}
-button{
-    padding:12px 24px;
-    background:#2563eb;
-    color:white;
-    border:none;
-    border-radius:8px;
-}
-</style>
-</head>
-<body>
-<h1>Hello from CodeDraw 🚀</h1>
-<p>Your AI-generated website will appear here.</p>
-<button>Click Me</button>
-</body>
-</html>
-`;
+import { useEditorStore } from "@/lib/editorStore";
 
 export default function Home() {
-  const [html, setHtml] = useState(defaultHtml);
+  const files = useEditorStore((s) => s.files);
 
   return (
-    <div className="flex h-screen flex-col">
+    <main className="flex h-screen flex-col overflow-hidden bg-neutral-950">
       <Toolbar />
 
-      <div className="flex flex-1">
-        <div className="w-64 border-r">
-          <FileExplorer />
-        </div>
+      <Group orientation="vertical" className="flex-1">
+        <Panel defaultSize={72} minSize={40}>
+          <Group orientation="horizontal">
+            <Panel defaultSize={18} minSize={12}>
+              <FileExplorer />
+            </Panel>
 
-        <div className="flex-1">
-          <LiveCanvas html={html} />
-        </div>
+            <Separator className="w-1 bg-neutral-800 hover:bg-blue-500 transition-colors" />
 
-        <div className="w-80 border-l">
-          <AIPanel setHtml={setHtml} />
-        </div>
-      </div>
+            <Panel defaultSize={57} minSize={30}>
+              <LiveCanvas files={files} />
+            </Panel>
 
-      <div className="h-48 border-t">
-        <BottomPanel />
-      </div>
-    </div>
+            <Separator className="w-1 bg-neutral-800 hover:bg-blue-500 transition-colors" />
+
+            <Panel defaultSize={25} minSize={18}>
+              <AIPanel />
+            </Panel>
+          </Group>
+        </Panel>
+
+        <Separator className="h-1 bg-neutral-800 hover:bg-blue-500 transition-colors" />
+
+        <Panel defaultSize={28} minSize={15}>
+          <BottomPanel />
+        </Panel>
+      </Group>
+    </main>
   );
 }
