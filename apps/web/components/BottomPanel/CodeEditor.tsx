@@ -23,30 +23,30 @@ export default function CodeEditor() {
     <Editor
       height="100%"
       language={language}
-      theme="codraw-ocean"
+      theme="codraw-sleek"
       value={files[selectedFile]}
       beforeMount={(monaco: Monaco) => {
-        monaco.editor.defineTheme("codraw-ocean", {
+        monaco.editor.defineTheme("codraw-sleek", {
           base: "vs-dark",
           inherit: true,
           rules: [
-            { token: "comment", foreground: "6bb6c9" },
-            { token: "keyword", foreground: "67e8f9" },
-            { token: "string", foreground: "7dd3fc" },
-            { token: "number", foreground: "34d399" },
-            { token: "tag", foreground: "22d3ee" },
-            { token: "attribute.name", foreground: "a7f3ff" },
+            { token: "comment", foreground: "71717a" },
+            { token: "keyword", foreground: "60a5fa" },
+            { token: "string", foreground: "a5b4fc" },
+            { token: "number", foreground: "93c5fd" },
+            { token: "tag", foreground: "60a5fa" },
+            { token: "attribute.name", foreground: "d4d4d8" },
           ],
           colors: {
-            "editor.background": "#02111c",
-            "editor.foreground": "#dffbff",
-            "editorLineNumber.foreground": "#2f7182",
-            "editorLineNumber.activeForeground": "#67e8f9",
-            "editorCursor.foreground": "#67e8f9",
-            "editor.selectionBackground": "#0e749066",
-            "editor.inactiveSelectionBackground": "#0e749033",
-            "editor.lineHighlightBackground": "#08334466",
-            "editorGutter.background": "#02111c",
+            "editor.background": "#0f0f11",
+            "editor.foreground": "#f4f4f5",
+            "editorLineNumber.foreground": "#52525b",
+            "editorLineNumber.activeForeground": "#a1a1aa",
+            "editorCursor.foreground": "#3b82f6",
+            "editor.selectionBackground": "#2563eb55",
+            "editor.inactiveSelectionBackground": "#27272a",
+            "editor.lineHighlightBackground": "#18181b",
+            "editorGutter.background": "#0f0f11",
           },
         });
       }}

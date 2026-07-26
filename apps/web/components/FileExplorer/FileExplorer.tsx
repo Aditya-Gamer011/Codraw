@@ -10,9 +10,9 @@ export default function FileExplorer() {
   const openFile = useEditorStore((s) => s.openFile);
 
   return (
-    <div className="ocean-glass h-full border-r p-4 text-cyan-50">
-      <h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-cyan-100">
-        <FolderOpen size={16} className="text-emerald-300" />
+    <div className="sleek-panel h-full border-r p-4 text-zinc-100">
+      <h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-zinc-400">
+        <FolderOpen size={16} className="text-zinc-300" />
         Project
       </h2>
 
@@ -23,8 +23,8 @@ export default function FileExplorer() {
             onClick={() => openFile(file)}
             className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm transition ${
               selectedFile === file
-                ? "ocean-button-active"
-                : "text-cyan-100/80 hover:bg-cyan-300/10 hover:text-white"
+                ? "sleek-button-active"
+                : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
             }`}
           >
             <FileCode2 size={15} />

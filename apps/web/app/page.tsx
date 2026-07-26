@@ -18,7 +18,7 @@ export default function Home() {
     useState(false);
 
   return (
-    <main className="ocean-shell flex h-screen flex-col overflow-hidden">
+    <main className="sleek-shell flex h-screen flex-col overflow-hidden">
       <Toolbar
         visualEditEnabled={visualEditEnabled}
         onVisualEditChange={setVisualEditEnabled}

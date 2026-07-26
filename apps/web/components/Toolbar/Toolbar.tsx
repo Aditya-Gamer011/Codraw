@@ -1,4 +1,4 @@
-import { MousePointer2, Waves } from "lucide-react";
+import { MousePointer2 } from "lucide-react";
 
 type Props = {
   visualEditEnabled: boolean;
@@ -10,13 +10,12 @@ export default function Toolbar({
   onVisualEditChange,
 }: Props) {
   return (
-    <div className="ocean-glass flex h-12 items-center gap-3 border-b px-4 text-white">
-      <div className="flex items-center gap-2 text-sm font-semibold tracking-wide text-cyan-100">
-        <Waves size={17} className="text-cyan-300" />
+    <div className="sleek-panel flex h-12 items-center gap-3 border-b px-4 text-white">
+      <div className="text-sm font-semibold tracking-wide text-zinc-100">
         Codraw
       </div>
 
-      <div className="h-5 w-px bg-cyan-200/20" />
+      <div className="h-5 w-px bg-zinc-700" />
 
       <button
         type="button"
@@ -28,8 +27,8 @@ export default function Toolbar({
         }
         className={`grid h-8 w-8 place-items-center rounded border transition ${
           visualEditEnabled
-            ? "ocean-button-active"
-            : "ocean-button"
+            ? "sleek-button-active"
+            : "sleek-button"
         }`}
       >
         <MousePointer2 size={16} />

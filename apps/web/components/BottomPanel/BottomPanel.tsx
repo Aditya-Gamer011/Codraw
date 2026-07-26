@@ -12,15 +12,15 @@ export default function BottomPanel() {
   const closeTab = useEditorStore((s) => s.closeTab);
 
   return (
-    <div className="ocean-glass flex h-full flex-col border-t">
-      <div className="flex border-b border-cyan-200/15 bg-slate-950/35">
+    <div className="sleek-panel flex h-full flex-col border-t">
+      <div className="flex border-b border-zinc-800 bg-zinc-950">
         {openTabs.map((file) => (
           <div
             key={file}
-            className={`flex items-center border-r border-cyan-200/15 ${
+            className={`flex items-center border-r border-zinc-800 ${
               selectedFile === file
-                ? "bg-cyan-300/12 text-white"
-                : "text-cyan-100/68"
+                ? "bg-zinc-900 text-white"
+                : "text-zinc-500"
             }`}
           >
             <button
@@ -32,7 +32,7 @@ export default function BottomPanel() {
 
             <button
               onClick={() => closeTab(file)}
-              className="grid h-7 w-7 place-items-center text-cyan-100/40 transition hover:text-rose-300"
+              className="grid h-7 w-7 place-items-center text-zinc-600 transition hover:text-rose-400"
               aria-label={`Close ${file}`}
             >
               <X size={14} />

@@ -90,19 +90,19 @@ function getVisualEditorScript() {
   Object.assign(overlay.style, {
     position: "fixed",
     zIndex: "2147483647",
-    border: "2px solid #22d3ee",
+    border: "2px solid #2563eb",
     boxSizing: "border-box",
     pointerEvents: "none",
     display: "none",
-    boxShadow: "0 0 0 1px rgba(240,253,250,.9), 0 0 26px rgba(34,211,238,.42), inset 0 0 22px rgba(103,232,249,.08)"
+    boxShadow: "0 0 0 1px rgba(255,255,255,.9), 0 10px 28px rgba(37,99,235,.22)"
   });
 
   const hoverBox = document.createElement("div");
   Object.assign(hoverBox.style, {
     position: "fixed",
     zIndex: "2147483646",
-    border: "1px dashed rgba(34,211,238,.82)",
-    background: "rgba(34,211,238,.08)",
+    border: "1px dashed rgba(37,99,235,.8)",
+    background: "rgba(37,99,235,.08)",
     boxSizing: "border-box",
     pointerEvents: "none",
     display: "none"
@@ -117,8 +117,8 @@ function getVisualEditorScript() {
     height: "22px",
     padding: "0 8px",
     borderRadius: "4px",
-    background: "linear-gradient(180deg, #67e8f9, #0891b2)",
-    color: "#00151f",
+    background: "#2563eb",
+    color: "#ffffff",
     font: "12px/22px system-ui, -apple-system, sans-serif",
     whiteSpace: "nowrap",
     overflow: "hidden",
@@ -134,8 +134,8 @@ function getVisualEditorScript() {
     height: "20px",
     padding: "0 6px",
     borderRadius: "4px",
-    background: "rgba(2, 18, 31, .92)",
-    color: "#cffafe",
+    background: "rgba(17, 24, 39, .94)",
+    color: "#ffffff",
     font: "11px/20px system-ui, -apple-system, sans-serif",
     whiteSpace: "nowrap",
     pointerEvents: "none"
@@ -159,7 +159,7 @@ function getVisualEditorScript() {
     width: "12px",
     height: "12px",
     border: "2px solid #ffffff",
-    background: "#22d3ee",
+    background: "#2563eb",
       borderRadius: "3px",
     boxSizing: "border-box",
     pointerEvents: "auto",
@@ -517,10 +517,10 @@ export default function LiveCanvas({
   }, [setFiles]);
 
   return (
-    <div className="h-full bg-[radial-gradient(circle_at_50%_0%,rgba(103,232,249,.18),transparent_32rem),rgba(1,15,26,.56)] p-3">
+    <div className="h-full bg-zinc-950 p-3">
       <iframe
         title="Live Preview"
-        className="h-full w-full rounded border border-cyan-200/20 bg-white shadow-[0_18px_50px_rgba(0,0,0,.32)]"
+        className="h-full w-full rounded border border-zinc-800 bg-white shadow-[0_18px_50px_rgba(0,0,0,.24)]"
         srcDoc={srcDoc}
         sandbox="allow-scripts"
       />

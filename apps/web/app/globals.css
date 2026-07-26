@@ -1,14 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #031824;
-  --foreground: #e6fbff;
-  --abyss: #031824;
-  --deep: #06263a;
-  --reef: #0d4f63;
-  --foam: #a7f3ff;
-  --glow: #22d3ee;
-  --kelp: #34d399;
+  --background: #09090b;
+  --foreground: #f4f4f5;
+  --surface: #111113;
+  --surface-soft: #18181b;
+  --border: #27272a;
+  --muted: #a1a1aa;
+  --accent: #3b82f6;
 }
 
 @theme inline {
@@ -18,18 +17,12 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background:
-    radial-gradient(circle at 20% -10%, rgba(34, 211, 238, 0.24), transparent 30rem),
-    radial-gradient(circle at 90% 15%, rgba(52, 211, 153, 0.16), transparent 26rem),
-    linear-gradient(160deg, #031824 0%, #06263a 48%, #02111c 100%);
+  background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
@@ -39,130 +32,62 @@ textarea {
   font: inherit;
 }
 
-.ocean-shell {
-  position: relative;
-  isolation: isolate;
+.sleek-shell {
   background:
-    linear-gradient(180deg, rgba(9, 54, 76, 0.5), rgba(3, 15, 28, 0.96)),
-    var(--abyss);
+    radial-gradient(circle at 50% -20%, rgba(59, 130, 246, 0.08), transparent 28rem),
+    #09090b;
 }
 
-.ocean-shell::before,
-.ocean-shell::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: -1;
+.sleek-panel {
+  border-color: var(--border);
+  background: rgba(17, 17, 19, 0.96);
 }
 
-.ocean-shell::before {
-  opacity: 0.32;
-  background:
-    repeating-radial-gradient(ellipse at 20% 10%, rgba(167, 243, 255, 0.16) 0 1px, transparent 2px 34px),
-    repeating-linear-gradient(105deg, transparent 0 32px, rgba(125, 211, 252, 0.08) 34px 36px, transparent 38px 80px);
-  background-size: 380px 260px, 260px 220px;
-  animation: water-caustics 18s linear infinite;
-  mix-blend-mode: screen;
+.sleek-panel-soft {
+  border-color: var(--border);
+  background: var(--surface-soft);
 }
 
-.ocean-shell::after {
-  background-image:
-    radial-gradient(circle, rgba(167, 243, 255, 0.45) 0 1.5px, transparent 2px),
-    radial-gradient(circle, rgba(52, 211, 153, 0.3) 0 1px, transparent 1.5px);
-  background-position: 12% 94%, 72% 98%;
-  background-size: 140px 220px, 190px 260px;
-  animation: bubbles-rise 16s linear infinite;
-  opacity: 0.5;
+.sleek-button {
+  border-color: #3f3f46;
+  background: #18181b;
+  color: #d4d4d8;
 }
 
-.ocean-glass {
-  border-color: rgba(103, 232, 249, 0.2);
-  background:
-    linear-gradient(180deg, rgba(10, 43, 61, 0.82), rgba(2, 18, 31, 0.92));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 14px 42px rgba(0, 0, 0, 0.24);
-  backdrop-filter: blur(14px);
-}
-
-.ocean-soft {
-  border-color: rgba(103, 232, 249, 0.16);
-  background: rgba(3, 24, 36, 0.72);
-}
-
-.ocean-button {
-  border-color: rgba(103, 232, 249, 0.26);
-  background: rgba(8, 47, 73, 0.65);
-  color: #dffbff;
-}
-
-.ocean-button:hover {
-  border-color: rgba(34, 211, 238, 0.78);
-  background: rgba(14, 116, 144, 0.42);
+.sleek-button:hover {
+  border-color: #52525b;
+  background: #202024;
   color: #ffffff;
-  box-shadow: 0 0 18px rgba(34, 211, 238, 0.16);
 }
 
-.ocean-button-active {
-  border-color: rgba(125, 211, 252, 0.95);
-  background:
-    linear-gradient(180deg, rgba(34, 211, 238, 0.95), rgba(14, 116, 144, 0.96));
-  color: #00151f;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.14),
-    0 0 24px rgba(34, 211, 238, 0.36);
+.sleek-button-active {
+  border-color: rgba(59, 130, 246, 0.7);
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.14);
 }
 
-.ocean-input {
-  border-color: rgba(103, 232, 249, 0.22);
-  background:
-    linear-gradient(180deg, rgba(2, 21, 34, 0.86), rgba(1, 15, 26, 0.92));
-  color: #e6fbff;
+.sleek-input {
+  border-color: #3f3f46;
+  background: #0f0f11;
+  color: #f4f4f5;
 }
 
-.ocean-input::placeholder {
-  color: rgba(186, 230, 253, 0.52);
+.sleek-input::placeholder {
+  color: #71717a;
 }
 
-.ocean-input:focus {
-  border-color: rgba(34, 211, 238, 0.92);
-  box-shadow:
-    0 0 0 1px rgba(34, 211, 238, 0.22),
-    0 0 24px rgba(34, 211, 238, 0.14);
+.sleek-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.18);
 }
 
 [data-panel-resize-handle] {
-  background:
-    linear-gradient(180deg, rgba(34, 211, 238, 0.28), rgba(6, 78, 59, 0.18));
-  transition: background 150ms ease, box-shadow 150ms ease;
+  background: #27272a;
+  transition: background 150ms ease;
 }
 
-[data-panel-resize-handle]:hover {
-  background: #22d3ee;
-  box-shadow: 0 0 18px rgba(34, 211, 238, 0.5);
-}
-
+[data-panel-resize-handle]:hover,
 [data-panel-resize-handle]:active {
-  background: #67e8f9;
-}
-
-@keyframes water-caustics {
-  from {
-    background-position: 0 0, 0 0;
-  }
-
-  to {
-    background-position: 380px 260px, -260px 220px;
-  }
-}
-
-@keyframes bubbles-rise {
-  from {
-    background-position: 12% 110%, 72% 120%;
-  }
-
-  to {
-    background-position: 12% -20%, 72% -30%;
-  }
+  background: var(--accent);
 }
