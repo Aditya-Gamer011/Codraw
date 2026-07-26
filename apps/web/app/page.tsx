@@ -16,13 +16,16 @@ export default function Home() {
   const setFiles = useEditorStore((s) => s.setFiles);
   const [visualEditEnabled, setVisualEditEnabled] =
     useState(false);
+  const [aiOpen, setAiOpen] = useState(true);    
 
   return (
     <main className="sleek-shell flex h-screen flex-col overflow-hidden">
       <Toolbar
-        visualEditEnabled={visualEditEnabled}
-        onVisualEditChange={setVisualEditEnabled}
-      />
+  visualEditEnabled={visualEditEnabled}
+  onVisualEditChange={setVisualEditEnabled}
+  aiOpen={aiOpen}
+  onAiToggle={() => setAiOpen((v) => !v)}
+/>
 
       <Group orientation="vertical" className="flex-1">
         <Panel defaultSize={72} minSize={40}>
@@ -41,11 +44,15 @@ export default function Home() {
               />
             </Panel>
 
-            <Separator className="w-1 transition-colors" />
+            {aiOpen && (
+  <>
+    <Separator className="w-1 transition-colors" />
 
-            <Panel defaultSize={25} minSize={18}>
-              <AIPanel />
-            </Panel>
+    <Panel defaultSize={25} minSize={18}>
+      <AIPanel />
+    </Panel>
+  </>
+)}
           </Group>
         </Panel>
 
