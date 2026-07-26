@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "lucide-react";
 
 import {
   isValidProject,
@@ -16,7 +17,36 @@ const modelOptions = [
 
 type ModelMode = (typeof modelOptions)[number]["id"];
 
-export default function AIPanel() {
+type Props = {
+  onClose: () => void;
+};
+
+const placeholders = [
+  "Build me a modern SaaS landing page with smooth animations.",
+  "Create a personal portfolio for a software engineer.",
+  "Design a futuristic AI startup homepage.",
+  "Make this website feel more premium and modern.",
+  "Turn this into an Apple-inspired website.",
+  "Redesign the hero section to improve conversions.",
+  "Build a beautiful restaurant website with an online menu.",
+  "Create a dashboard for a finance analytics platform.",
+  "Design a landing page for my indie game.",
+  "Build a minimalist portfolio using glassmorphism.",
+  "Create a sleek e-commerce homepage for sneakers.",
+  "Make this page mobile-friendly.",
+  "Improve the typography and spacing across the site.",
+  "Add subtle animations and micro-interactions.",
+  "Give this website a cyberpunk aesthetic.",
+  "Design a homepage for a luxury hotel.",
+  "Create a modern coffee shop website.",
+  "Build a clean travel blog homepage.",
+  "Generate a startup website that feels like Linear.",
+  "Help me build something awesome.",
+];
+
+export default function AIPanel({
+  onClose,
+}: Props) {
   const files = useEditorStore((s) => s.files);
   const setFiles = useEditorStore((s) => s.setFiles);
 
@@ -25,14 +55,12 @@ export default function AIPanel() {
   const [modelMode, setModelMode] =
     useState<ModelMode>("lightning");
 
-  const suggestions = [
-    "Modern SaaS landing page",
-    "Personal portfolio",
-    "Dashboard UI",
-    "Restaurant website",
-    "Coffee shop homepage",
-    "Travel blog",
-  ];
+  const [placeholder] = useState(
+    () =>
+      placeholders[
+        Math.floor(Math.random() * placeholders.length)
+      ]
+  );
 
   async function generateWebsite() {
     if (!prompt.trim()) return;
@@ -70,7 +98,6 @@ export default function AIPanel() {
       }
 
       setFiles(updatedFiles);
-
       setPrompt("");
     } catch (err) {
       console.error(err);
@@ -83,25 +110,25 @@ export default function AIPanel() {
   return (
     <div className="sleek-panel flex h-full flex-col border-l text-zinc-100">
       <div className="border-b border-zinc-800 p-4">
-        <h2 className="text-lg font-semibold text-white">
-          AI Assistant
-        </h2>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              AI Assistant
+            </h2>
 
-        <p className="mt-1 text-sm text-zinc-500">
-          Describe the website you want to build.
-        </p>
-      </div>
+            <p className="mt-1 text-sm text-zinc-500">
+              Describe what you&apos;d like to build or improve.
+            </p>
+          </div>
 
-      <div className="flex flex-wrap gap-2 p-4">
-        {suggestions.map((suggestion) => (
           <button
-            key={suggestion}
-            onClick={() => setPrompt(suggestion)}
-            className="sleek-button rounded-full border px-3 py-1 text-xs transition"
+            onClick={onClose}
+            className="sleek-button grid h-8 w-8 place-items-center rounded transition hover:bg-red-500/10 hover:text-red-400"
+            title="Close AI Assistant"
           >
-            {suggestion}
+            <X size={16} />
           </button>
-        ))}
+        </div>
       </div>
 
       <div className="flex flex-1 flex-col gap-4 p-4">
@@ -125,7 +152,7 @@ export default function AIPanel() {
 
         <textarea
           className="sleek-input flex-1 resize-none rounded-lg border p-3 outline-none transition"
-          placeholder="Build me a modern landing page for an AI startup..."
+          placeholder={placeholder}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
         />

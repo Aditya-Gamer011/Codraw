@@ -49,7 +49,9 @@ export default function Home() {
     <Separator className="w-1 transition-colors" />
 
     <Panel defaultSize={25} minSize={18}>
-      <AIPanel />
+      <AIPanel
+  onClose={() => setAiOpen(false)}
+/>
     </Panel>
   </>
 )}
