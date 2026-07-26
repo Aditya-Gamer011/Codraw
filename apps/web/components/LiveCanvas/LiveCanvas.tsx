@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Check, X } from "lucide-react";
 
 import { ProjectFiles } from "@/lib/types";
 
@@ -13,10 +14,36 @@ type Props = {
 };
 
 type VisualEdit = {
-  type: "CODRAW_VISUAL_EDIT";
+  type: "CODRAW_VISUAL_STAGE";
+  styleEdits: PendingVisualStyleEdit[];
+  textEdits: PendingVisualTextEdit[];
+};
+
+type VisualSelection = {
+  type: "CODRAW_VISUAL_SELECT";
+  selector: string;
+  tagName: string;
+  canEditText: boolean;
+  styles: {
+    color: string;
+    backgroundColor: string;
+    fontSize: string;
+  };
+};
+
+type VisualMessage = VisualEdit | VisualSelection;
+
+type PendingVisualStyleEdit = {
   selector: string;
   styles: Record<string, string>;
 };
+
+type PendingVisualTextEdit = {
+  selector: string;
+  text: string;
+};
+
+type SelectedElementInfo = Omit<VisualSelection, "type">;
 
 const visualEditStart = "/* Codraw visual edits */";
 const visualEditEnd = "/* End Codraw visual edits */";
@@ -64,14 +91,58 @@ function applyVisualEditToCss(
   return css.replace(sectionPattern, nextSection);
 }
 
+function applyVisualEditsToCss(
+  css: string,
+  edits: PendingVisualStyleEdit[]
+) {
+  return edits.reduce(
+    (nextCss, edit) =>
+      applyVisualEditToCss(
+        nextCss,
+        edit.selector,
+        edit.styles
+      ),
+    css
+  );
+}
+
+function applyVisualTextEditsToHtml(
+  html: string,
+  edits: PendingVisualTextEdit[]
+) {
+  if (edits.length === 0) return html;
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+
+  for (const edit of edits) {
+    const element = doc.querySelector(edit.selector);
+
+    if (element) {
+      element.textContent = edit.text;
+    }
+  }
+
+  return `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`;
+}
+
 function getVisualEditorScript() {
   return `
 (() => {
   const editableSelector = "body *:not(#codraw-editor-overlay):not(#codraw-editor-overlay *)";
+  const textEditableSelector = "h1,h2,h3,h4,h5,h6,p,span,a,button,li,label,strong,em";
   let selectedElement = null;
   let selectedSelector = "";
   let interaction = null;
   let hoverElement = null;
+  let operationStartSnapshot = null;
+  let didDrag = false;
+  const baseSnapshots = new Map();
+  const textBaseSnapshots = new Map();
+  const stagedStyleEdits = new Map();
+  const stagedTextEdits = new Map();
+  const undoStack = [];
+  const redoStack = [];
 
   const overlay = document.createElement("div");
   overlay.id = "codraw-editor-overlay";
@@ -205,9 +276,98 @@ function getVisualEditorScript() {
     return element.tagName.toLowerCase() + id + classes;
   }
 
+  function canEditText(element) {
+    return (
+      element.matches(textEditableSelector) &&
+      Array.from(element.children).length === 0
+    );
+  }
+
+  function normalizeColor(value) {
+    const match = value.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
+
+    if (!match) return "#000000";
+
+    return (
+      "#" +
+      [match[1], match[2], match[3]]
+        .map((part) => Number(part).toString(16).padStart(2, "0"))
+        .join("")
+    );
+  }
+
   function getPixelStyle(element, property) {
     const value = Number.parseFloat(getComputedStyle(element)[property]);
     return Number.isFinite(value) ? value : 0;
+  }
+
+  function getInlineSnapshot(element) {
+    return {
+      position: element.style.position,
+      left: element.style.left,
+      top: element.style.top,
+      width: element.style.width,
+      height: element.style.height,
+      boxSizing: element.style.boxSizing,
+      color: element.style.color,
+      backgroundColor: element.style.backgroundColor,
+      fontSize: element.style.fontSize
+    };
+  }
+
+  function getCssStyles(element) {
+    const style = element.style;
+    const rect = element.getBoundingClientRect();
+
+    const styles = {
+      position: style.position || "relative",
+      left: style.left || "0px",
+      top: style.top || "0px",
+      width: style.width || Math.round(rect.width) + "px",
+      height: style.height || Math.round(rect.height) + "px",
+      "box-sizing": style.boxSizing || "border-box"
+    };
+
+    if (style.color) {
+      styles.color = style.color;
+    }
+
+    if (style.backgroundColor) {
+      styles["background-color"] = style.backgroundColor;
+    }
+
+    if (style.fontSize) {
+      styles["font-size"] = style.fontSize;
+    }
+
+    return styles;
+  }
+
+  function snapshotsMatch(first, second) {
+    return (
+      first.position === second.position &&
+      first.left === second.left &&
+      first.top === second.top &&
+      first.width === second.width &&
+      first.height === second.height &&
+      first.boxSizing === second.boxSizing &&
+      first.color === second.color &&
+      first.backgroundColor === second.backgroundColor &&
+      first.fontSize === second.fontSize
+    );
+  }
+
+  function applyInlineSnapshot(element, snapshot) {
+    element.style.position = snapshot.position;
+    element.style.left = snapshot.left;
+    element.style.top = snapshot.top;
+    element.style.width = snapshot.width;
+    element.style.height = snapshot.height;
+    element.style.boxSizing = snapshot.boxSizing;
+    element.style.color = snapshot.color;
+    element.style.backgroundColor = snapshot.backgroundColor;
+    element.style.fontSize = snapshot.fontSize;
+    updateOverlay();
   }
 
   function ensureEditablePosition(element) {
@@ -267,29 +427,207 @@ function getVisualEditorScript() {
   function selectElement(element) {
     selectedElement = element;
     selectedSelector = getSelector(element);
+    if (!baseSnapshots.has(selectedSelector)) {
+      baseSnapshots.set(selectedSelector, getInlineSnapshot(element));
+    }
     window.focus();
     updateHover(null);
     updateOverlay();
+    syncSelection();
   }
 
-  function commitEdit() {
-    if (!selectedElement || !selectedSelector) return;
-
-    const style = selectedElement.style;
+  function syncPendingEdits() {
     window.parent.postMessage(
       {
-        type: "CODRAW_VISUAL_EDIT",
+        type: "CODRAW_VISUAL_STAGE",
+        styleEdits: Array.from(stagedStyleEdits, ([selector, styles]) => ({
+          selector,
+          styles
+        })),
+        textEdits: Array.from(stagedTextEdits, ([selector, text]) => ({
+          selector,
+          text
+        }))
+      },
+      "*"
+    );
+  }
+
+  function syncSelection() {
+    if (!selectedElement || !selectedSelector) return;
+
+    const computed = getComputedStyle(selectedElement);
+    window.parent.postMessage(
+      {
+        type: "CODRAW_VISUAL_SELECT",
         selector: selectedSelector,
+        tagName: selectedElement.tagName.toLowerCase(),
+        canEditText: canEditText(selectedElement),
         styles: {
-          position: style.position || "relative",
-          left: style.left || "0px",
-          top: style.top || "0px",
-          width: style.width || Math.round(selectedElement.getBoundingClientRect().width) + "px",
-          height: style.height || Math.round(selectedElement.getBoundingClientRect().height) + "px",
-          "box-sizing": style.boxSizing || "border-box"
+          color: normalizeColor(computed.color),
+          backgroundColor:
+            computed.backgroundColor === "rgba(0, 0, 0, 0)"
+              ? "#ffffff"
+              : normalizeColor(computed.backgroundColor),
+          fontSize: Math.round(Number.parseFloat(computed.fontSize)).toString()
         }
       },
       "*"
+    );
+  }
+
+  function updateStagedEdit(selector, element, snapshot) {
+    const baseSnapshot = baseSnapshots.get(selector);
+
+    if (baseSnapshot && snapshotsMatch(snapshot, baseSnapshot)) {
+      stagedStyleEdits.delete(selector);
+    } else {
+      stagedStyleEdits.set(selector, getCssStyles(element));
+    }
+
+    syncPendingEdits();
+    syncSelection();
+  }
+
+  function stageEdit(beforeSnapshot) {
+    if (!selectedElement || !selectedSelector) return;
+
+    const afterSnapshot = getInlineSnapshot(selectedElement);
+
+    if (
+      beforeSnapshot &&
+      snapshotsMatch(beforeSnapshot, afterSnapshot)
+    ) {
+      return;
+    }
+
+    if (beforeSnapshot) {
+      undoStack.push({
+        selector: selectedSelector,
+        before: beforeSnapshot,
+        after: afterSnapshot
+      });
+      redoStack.length = 0;
+    }
+
+    updateStagedEdit(
+      selectedSelector,
+      selectedElement,
+      afterSnapshot
+    );
+  }
+
+  function applyHistoryEntry(entry, snapshot) {
+    const element = document.querySelector(entry.selector);
+    if (!element) return;
+
+    selectedElement = element;
+    selectedSelector = entry.selector;
+
+    if (entry.kind === "text") {
+      element.textContent = snapshot;
+      updateStagedTextEdit(entry.selector, snapshot);
+      updateOverlay();
+      return;
+    }
+
+    applyInlineSnapshot(element, snapshot);
+    updateStagedEdit(entry.selector, element, snapshot);
+  }
+
+  function undoVisualEdit() {
+    const entry = undoStack.pop();
+    if (!entry) return;
+
+    redoStack.push(entry);
+    applyHistoryEntry(entry, entry.before);
+  }
+
+  function redoVisualEdit() {
+    const entry = redoStack.pop();
+    if (!entry) return;
+
+    undoStack.push(entry);
+    applyHistoryEntry(entry, entry.after);
+  }
+
+  function updateStagedTextEdit(selector, text) {
+    const baseText = textBaseSnapshots.get(selector);
+
+    if (text === baseText) {
+      stagedTextEdits.delete(selector);
+    } else {
+      stagedTextEdits.set(selector, text);
+    }
+
+    syncPendingEdits();
+    syncSelection();
+  }
+
+  function finishTextEdit(element, beforeText) {
+    element.removeAttribute("contenteditable");
+    element.style.outline = "";
+
+    const afterText = element.textContent || "";
+
+    if (beforeText !== afterText) {
+      undoStack.push({
+        kind: "text",
+        selector: getSelector(element),
+        before: beforeText,
+        after: afterText
+      });
+      redoStack.length = 0;
+      updateStagedTextEdit(getSelector(element), afterText);
+    }
+
+    updateOverlay();
+  }
+
+  function startTextEdit(element) {
+    if (!canEditText(element)) return;
+
+    selectElement(element);
+
+    if (!textBaseSnapshots.has(selectedSelector)) {
+      textBaseSnapshots.set(selectedSelector, element.textContent || "");
+    }
+
+    const beforeText = element.textContent || "";
+    element.setAttribute("contenteditable", "plaintext-only");
+    element.setAttribute("spellcheck", "false");
+    element.style.outline = "2px solid #2563eb";
+    element.focus();
+
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    function handleTextKeydown(event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        element.blur();
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        element.textContent = beforeText;
+        element.blur();
+      }
+    }
+
+    element.addEventListener("keydown", handleTextKeydown);
+
+    element.addEventListener(
+      "blur",
+      () => {
+        element.removeEventListener("keydown", handleTextKeydown);
+        finishTextEdit(element, beforeText);
+      },
+      { once: true }
     );
   }
 
@@ -313,9 +651,15 @@ function getVisualEditorScript() {
     event.preventDefault();
     event.stopPropagation();
     selectElement(target);
+
+    if (!didDrag) {
+      startTextEdit(target);
+    }
   }, true);
 
   document.addEventListener("pointerdown", (event) => {
+    if (document.activeElement?.isContentEditable) return;
+
     const handle = event.target.closest?.("[data-handle]");
     const target = getEditableTarget(event.target);
 
@@ -341,6 +685,7 @@ function getVisualEditorScript() {
 
     event.preventDefault();
     event.stopPropagation();
+    didDrag = false;
 
     const rect = selectedElement.getBoundingClientRect();
     ensureEditablePosition(selectedElement);
@@ -355,6 +700,7 @@ function getVisualEditorScript() {
       startWidth: rect.width,
       startHeight: rect.height
     };
+    operationStartSnapshot = getInlineSnapshot(selectedElement);
 
     event.target.setPointerCapture?.(event.pointerId);
   }, true);
@@ -364,6 +710,7 @@ function getVisualEditorScript() {
 
     const deltaX = event.clientX - interaction.startX;
     const deltaY = event.clientY - interaction.startY;
+    didDrag = didDrag || Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2;
 
     if (interaction.mode === "move") {
       setBox(
@@ -399,10 +746,35 @@ function getVisualEditorScript() {
 
     interaction = null;
     updateOverlay();
-    commitEdit();
+    stageEdit(operationStartSnapshot);
+    operationStartSnapshot = null;
+    setTimeout(() => {
+      didDrag = false;
+    }, 0);
   }, true);
 
   document.addEventListener("keydown", (event) => {
+    if (document.activeElement?.isContentEditable) return;
+
+    const isUndo =
+      (event.ctrlKey || event.metaKey) &&
+      !event.shiftKey &&
+      event.key.toLowerCase() === "z";
+    const isRedo =
+      (event.ctrlKey || event.metaKey) &&
+      (event.key.toLowerCase() === "y" ||
+        (event.shiftKey && event.key.toLowerCase() === "z"));
+
+    if (isUndo || isRedo) {
+      event.preventDefault();
+      if (isUndo) {
+        undoVisualEdit();
+      } else {
+        redoVisualEdit();
+      }
+      return;
+    }
+
     if (!selectedElement) return;
 
     if (event.key === "Escape") {
@@ -421,6 +793,7 @@ function getVisualEditorScript() {
     const dx = event.key === "ArrowRight" ? step : event.key === "ArrowLeft" ? -step : 0;
     const dy = event.key === "ArrowDown" ? step : event.key === "ArrowUp" ? -step : 0;
     const rect = selectedElement.getBoundingClientRect();
+    const beforeSnapshot = getInlineSnapshot(selectedElement);
 
     setBox(
       getPixelStyle(selectedElement, "left") + dx,
@@ -428,13 +801,23 @@ function getVisualEditorScript() {
       rect.width,
       rect.height
     );
-    commitEdit();
+    stageEdit(beforeSnapshot);
   }, true);
 
   window.addEventListener("scroll", updateOverlay, true);
   window.addEventListener("resize", () => {
     updateOverlay();
     updateHover(hoverElement);
+  });
+
+  window.addEventListener("message", (event) => {
+    if (event.data?.type !== "CODRAW_VISUAL_APPLY_STYLE") return;
+    if (!selectedElement || !selectedSelector) return;
+
+    const beforeSnapshot = getInlineSnapshot(selectedElement);
+    selectedElement.style[event.data.property] = event.data.value;
+    updateOverlay();
+    stageEdit(beforeSnapshot);
   });
 })();
 `;
@@ -475,7 +858,17 @@ export default function LiveCanvas({
   setFiles,
   visualEditEnabled,
 }: Props) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const pendingVisualCssRef = useRef<string | null>(null);
+  const [pendingStyleEdits, setPendingStyleEdits] = useState<
+    PendingVisualStyleEdit[]
+  >([]);
+  const [pendingTextEdits, setPendingTextEdits] = useState<
+    PendingVisualTextEdit[]
+  >([]);
+  const [selectedInfo, setSelectedInfo] =
+    useState<SelectedElementInfo | null>(null);
+  const [frameKey, setFrameKey] = useState(0);
   const [srcDoc, setSrcDoc] = useState(() =>
     buildPreviewHtml(files, visualEditEnabled)
   );
@@ -490,23 +883,21 @@ export default function LiveCanvas({
   }, [files, visualEditEnabled]);
 
   useEffect(() => {
-    function handleMessage(event: MessageEvent<VisualEdit>) {
-      if (event.data?.type !== "CODRAW_VISUAL_EDIT") return;
+    function handleMessage(event: MessageEvent<VisualMessage>) {
+      if (event.data?.type === "CODRAW_VISUAL_STAGE") {
+        setPendingStyleEdits(event.data.styleEdits);
+        setPendingTextEdits(event.data.textEdits);
+        return;
+      }
 
-      setFiles((prev) => {
-        const nextCss = applyVisualEditToCss(
-          prev["style.css"],
-          event.data.selector,
-          event.data.styles
-        );
-
-        pendingVisualCssRef.current = nextCss;
-
-        return {
-          ...prev,
-          "style.css": nextCss,
-        };
-      });
+      if (event.data?.type === "CODRAW_VISUAL_SELECT") {
+        setSelectedInfo({
+          selector: event.data.selector,
+          tagName: event.data.tagName,
+          canEditText: event.data.canEditText,
+          styles: event.data.styles,
+        });
+      }
     }
 
     window.addEventListener("message", handleMessage);
@@ -514,11 +905,160 @@ export default function LiveCanvas({
     return () => {
       window.removeEventListener("message", handleMessage);
     };
-  }, [setFiles]);
+  }, []);
+
+  const pendingCount =
+    pendingStyleEdits.length + pendingTextEdits.length;
+
+  function saveVisualChanges() {
+    if (pendingCount === 0) return;
+
+    setFiles((prev) => {
+      const nextCss = applyVisualEditsToCss(
+        prev["style.css"],
+        pendingStyleEdits
+      );
+      const nextHtml = applyVisualTextEditsToHtml(
+        prev["index.html"],
+        pendingTextEdits
+      );
+
+      pendingVisualCssRef.current = nextCss;
+
+      return {
+        ...prev,
+        "index.html": nextHtml,
+        "style.css": nextCss,
+      };
+    });
+    setPendingStyleEdits([]);
+    setPendingTextEdits([]);
+  }
+
+  function discardVisualChanges() {
+    setPendingStyleEdits([]);
+    setPendingTextEdits([]);
+    setSelectedInfo(null);
+    setSrcDoc(buildPreviewHtml(files, visualEditEnabled));
+    setFrameKey((current) => current + 1);
+  }
+
+  function applySelectedStyle(
+    property: "color" | "backgroundColor" | "fontSize",
+    value: string
+  ) {
+    if (!selectedInfo) return;
+
+    const nextValue =
+      property === "fontSize" ? `${value}px` : value;
+
+    setSelectedInfo((current) =>
+      current
+        ? {
+            ...current,
+            styles: {
+              ...current.styles,
+              [property]: value,
+            },
+          }
+        : current
+    );
+
+    iframeRef.current?.contentWindow?.postMessage(
+      {
+        type: "CODRAW_VISUAL_APPLY_STYLE",
+        property,
+        value: nextValue,
+      },
+      "*"
+    );
+  }
 
   return (
-    <div className="h-full bg-zinc-950 p-3">
+    <div className="relative h-full bg-zinc-950 p-3">
+      {pendingCount > 0 && (
+        <div className="absolute right-5 top-5 z-10 flex items-center gap-2 rounded border border-zinc-800 bg-zinc-950/95 p-1 shadow-lg">
+          <span className="px-2 text-xs text-zinc-400">
+            Save changes
+          </span>
+
+          <button
+            type="button"
+            onClick={saveVisualChanges}
+            className="grid h-8 w-8 place-items-center rounded bg-emerald-600 text-white transition hover:bg-emerald-500"
+            aria-label="Save visual changes to code"
+            title="Save visual changes to code"
+          >
+            <Check size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={discardVisualChanges}
+            className="grid h-8 w-8 place-items-center rounded bg-zinc-800 text-zinc-300 transition hover:bg-zinc-700 hover:text-white"
+            aria-label="Discard visual changes"
+            title="Discard visual changes"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {visualEditEnabled && selectedInfo && (
+        <div className="absolute bottom-5 left-5 z-10 flex items-center gap-3 rounded border border-zinc-800 bg-zinc-950/95 p-2 text-xs text-zinc-400 shadow-lg">
+          <span className="min-w-14 uppercase tracking-wide">
+            {selectedInfo.tagName}
+          </span>
+
+          <label className="flex items-center gap-2">
+            Size
+            <input
+              type="number"
+              min="8"
+              max="160"
+              value={selectedInfo.styles.fontSize}
+              onChange={(event) =>
+                applySelectedStyle(
+                  "fontSize",
+                  event.target.value
+                )
+              }
+              className="h-8 w-16 rounded border border-zinc-700 bg-zinc-900 px-2 text-white outline-none focus:border-blue-500"
+            />
+          </label>
+
+          <label className="flex items-center gap-2">
+            Text
+            <input
+              type="color"
+              value={selectedInfo.styles.color}
+              onChange={(event) =>
+                applySelectedStyle("color", event.target.value)
+              }
+              className="h-8 w-9 cursor-pointer rounded border border-zinc-700 bg-zinc-900 p-1"
+            />
+          </label>
+
+          <label className="flex items-center gap-2">
+            Fill
+            <input
+              type="color"
+              value={selectedInfo.styles.backgroundColor}
+              onChange={(event) =>
+                applySelectedStyle(
+                  "backgroundColor",
+                  event.target.value
+                )
+              }
+              className="h-8 w-9 cursor-pointer rounded border border-zinc-700 bg-zinc-900 p-1"
+            />
+          </label>
+        </div>
+      )}
+
       <iframe
+        ref={iframeRef}
+        key={frameKey}
         title="Live Preview"
         className="h-full w-full rounded border border-zinc-800 bg-white shadow-[0_18px_50px_rgba(0,0,0,.24)]"
         srcDoc={srcDoc}
