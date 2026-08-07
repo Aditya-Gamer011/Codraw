@@ -281,7 +281,7 @@ export const HERO_PREVIEW_TEMPLATE: Record<string, string> = {
     </h1>
 
     <p class="hero-sub" id="heroSub">
-        The next-generation interactive workspace. Build, collaborate, and ship immersive 3D experiences directly in the browser.
+        The next-generation interactive workspace. Build, Customize, and Publish your website directly from 1 page!
     </p>
 </main>
 
