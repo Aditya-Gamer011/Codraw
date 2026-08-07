@@ -21,26 +21,58 @@
   box-sizing: border-box;
 }
 
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
 }
 
 button,
-textarea {
-  font: inherit;
+a,
+select,
+input[type="button"],
+input[type="submit"],
+input[type="checkbox"] {
+  cursor: pointer;
+}
+
+button:disabled,
+a:disabled,
+select:disabled {
+  cursor: not-allowed;
 }
 
 .sleek-shell {
   background:
-    radial-gradient(circle at 50% -20%, rgba(59, 130, 246, 0.08), transparent 28rem),
+    radial-gradient(circle at 50% -20%, rgba(99, 102, 241, 0.12), transparent 32rem),
+    radial-gradient(circle at 10% 90%, rgba(56, 189, 248, 0.05), transparent 24rem),
     #09090b;
 }
 
 .sleek-panel {
   border-color: var(--border);
   background: rgba(17, 17, 19, 0.96);
+  backdrop-filter: blur(16px);
 }
 
 .sleek-panel-soft {
@@ -49,28 +81,41 @@ textarea {
 }
 
 .sleek-button {
+  cursor: pointer;
   border-color: #3f3f46;
   background: #18181b;
   color: #d4d4d8;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
 .sleek-button:hover {
   border-color: #52525b;
-  background: #202024;
+  background: #222226;
   color: #ffffff;
 }
 
+.sleek-button:active {
+  background: #18181b;
+}
+
+.sleek-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .sleek-button-active {
-  border-color: rgba(59, 130, 246, 0.7);
-  background: #2563eb;
+  cursor: pointer;
+  border-color: rgba(99, 102, 241, 0.7);
+  background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
   color: #ffffff;
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.14);
+  box-shadow: 0 4px 14px -2px rgba(99, 102, 241, 0.4);
 }
 
 .sleek-input {
   border-color: #3f3f46;
   background: #0f0f11;
   color: #f4f4f5;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .sleek-input::placeholder {
@@ -79,7 +124,7 @@ textarea {
 
 .sleek-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.18);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
 }
 
 [data-panel-resize-handle] {
@@ -92,3 +137,38 @@ textarea {
   background: var(--accent);
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleUp {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scaleUp {
+  animation: scaleUp 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-glowPulse {
+  animation: glowPulse 3s ease-in-out infinite;
+}

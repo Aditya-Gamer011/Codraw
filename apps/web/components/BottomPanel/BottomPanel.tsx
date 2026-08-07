@@ -6,15 +6,18 @@ import CodeEditor from "./CodeEditor";
 import { useEditorStore } from "@/lib/editorStore";
 
 export default function BottomPanel() {
+  const files = useEditorStore((s) => s.files);
   const openTabs = useEditorStore((s) => s.openTabs);
   const selectedFile = useEditorStore((s) => s.selectedFile);
   const openFile = useEditorStore((s) => s.openFile);
   const closeTab = useEditorStore((s) => s.closeTab);
 
+  const activeTabs = openTabs.filter((file) => files[file] !== undefined);
+
   return (
     <div className="sleek-panel flex h-full flex-col border-t">
-      <div className="flex border-b border-zinc-800 bg-zinc-950">
-        {openTabs.map((file) => (
+      <div className="flex h-9 items-center border-b border-zinc-800 bg-zinc-950">
+        {activeTabs.map((file) => (
           <div
             key={file}
             className={`flex items-center border-r border-zinc-800 ${

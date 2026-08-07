@@ -15,10 +15,13 @@ export async function GET(req: Request) {
   }
 
   const state = randomUUID();
-  const url = new URL(req.url);
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  const proto = req.headers.get("x-forwarded-proto") ?? "https";
+  const origin = host ? `${proto}://${host}` : new URL(req.url).origin;
+
   const redirectUri =
     process.env.GITHUB_CALLBACK_URL ??
-    `${url.origin}/api/github/callback`;
+    `${origin}/api/github/callback`;
   const authorizeUrl = new URL(
     "https://github.com/login/oauth/authorize"
   );

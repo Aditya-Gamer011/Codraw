@@ -3,50 +3,6 @@
 import { create } from "zustand";
 import { ProjectFiles } from "./types";
 
-const defaultFiles: ProjectFiles = {
-  "index.html": `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Preview</title>
-</head>
-<body>
-  <main>
-    <h1>Preview</h1>
-    <p>Whatever you make will appear here.</p>
-  </main>
-</body>
-</html>`,
-
-  "style.css": `body {
-  margin: 0;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-family: system-ui, -apple-system, sans-serif;
-  background-color: #0f172a;
-  color: #f8fafc;
-  text-align: center;
-}
-
-h1 {
-  font-size: 2rem;
-  margin-bottom: 0.5rem;
-  color: #38bdf8; /* Soft blue accent */
-}
-
-p {
-  color: #94a3b8;
-  max-width: 400px;
-  line-height: 1.5;
-  margin: 0;
-}`,
-
-  "script.js": ``,
-};
-
 interface EditorStore {
   files: ProjectFiles;
 
@@ -54,35 +10,99 @@ interface EditorStore {
     files: ProjectFiles | ((prev: ProjectFiles) => ProjectFiles)
   ) => void;
 
-  selectedFile: keyof ProjectFiles;
-  setSelectedFile: (file: keyof ProjectFiles) => void;
+  selectedFile: string;
+  setSelectedFile: (file: string) => void;
 
-  openTabs: (keyof ProjectFiles)[];
-  setOpenTabs: (tabs: (keyof ProjectFiles)[]) => void;
+  openTabs: string[];
+  setOpenTabs: (tabs: string[]) => void;
 
-  openFile: (file: keyof ProjectFiles) => void;
-  closeTab: (file: keyof ProjectFiles) => void;
+  openFile: (file: string) => void;
+  closeTab: (file: string) => void;
+  addFile: (filename: string, content?: string) => void;
+  deleteFile: (filename: string) => void;
+  renameFile: (oldFilename: string, newFilename: string) => void;
+
+  history: ProjectFiles[];
+  future: ProjectFiles[];
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 export const useEditorStore = create<EditorStore>((set, get) => ({
-  files: defaultFiles,
+  files: {},
+  history: [],
+  future: [],
+  canUndo: false,
+  canRedo: false,
 
-  setFiles: (files) =>
-    set((state) => ({
-      files:
-        typeof files === "function"
-          ? files(state.files)
-          : files,
-    })),
+  setFiles: (filesAction) => {
+    const { files, history, openTabs, selectedFile } = get();
+    const newFiles =
+      typeof filesAction === "function"
+        ? filesAction(files)
+        : filesAction;
 
-  selectedFile: "index.html",
+    if (JSON.stringify(files) === JSON.stringify(newFiles)) return;
+
+    const newHistory = [...history, files].slice(-30);
+    const validTabs = openTabs.filter((tab) => newFiles[tab] !== undefined);
+    const nextSelected = newFiles[selectedFile] !== undefined ? selectedFile : (validTabs[0] || "");
+
+    set({
+      files: newFiles,
+      history: newHistory,
+      future: [],
+      canUndo: newHistory.length > 0,
+      canRedo: false,
+      openTabs: validTabs,
+      selectedFile: nextSelected,
+    });
+  },
+
+  undo: () => {
+    const { files, history, future } = get();
+    if (history.length === 0) return;
+
+    const previousFiles = history[history.length - 1];
+    const newHistory = history.slice(0, history.length - 1);
+    const newFuture = [files, ...future];
+
+    set({
+      files: previousFiles,
+      history: newHistory,
+      future: newFuture,
+      canUndo: newHistory.length > 0,
+      canRedo: true,
+    });
+  },
+
+  redo: () => {
+    const { files, history, future } = get();
+    if (future.length === 0) return;
+
+    const nextFiles = future[0];
+    const newFuture = future.slice(1);
+    const newHistory = [...history, files];
+
+    set({
+      files: nextFiles,
+      history: newHistory,
+      future: newFuture,
+      canUndo: true,
+      canRedo: newFuture.length > 0,
+    });
+  },
+
+  selectedFile: "",
 
   setSelectedFile: (file) =>
     set({
       selectedFile: file,
     }),
 
-  openTabs: ["index.html"],
+  openTabs: [],
 
   setOpenTabs: (tabs) =>
     set({
@@ -93,45 +113,106 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const { openTabs } = get();
 
     if (!openTabs.includes(file)) {
-        set({
-            openTabs: [...openTabs, file],
-            selectedFile: file,
-        });
+      set({
+        openTabs: [...openTabs, file],
+        selectedFile: file,
+      });
 
-        return;
+      return;
     }
 
     set({
-        selectedFile: file,
+      selectedFile: file,
     });
-},
+  },
 
   closeTab(file) {
     const { openTabs, selectedFile } = get();
 
-    if (openTabs.length === 1) return;
-
     const closedIndex = openTabs.indexOf(file);
-
-    const newTabs = openTabs.filter(
-        (tab) => tab !== file
-    );
+    const newTabs = openTabs.filter((tab) => tab !== file);
 
     let nextSelected = selectedFile;
 
     if (selectedFile === file) {
-        nextSelected =
-            newTabs[
-                Math.max(
-                    0,
-                    closedIndex - 1
-                )
-            ];
+      if (newTabs.length === 0) {
+        nextSelected = "";
+      } else {
+        nextSelected = newTabs[Math.max(0, closedIndex - 1)];
+      }
     }
 
     set({
-        openTabs: newTabs,
-        selectedFile: nextSelected,
+      openTabs: newTabs,
+      selectedFile: nextSelected,
     });
-},
+  },
+
+  addFile(filename, content = "") {
+    const { files, openTabs, history } = get();
+    if (files[filename]) return;
+
+    const newFiles = { ...files, [filename]: content };
+    const newHistory = [...history, files].slice(-30);
+
+    set({
+      files: newFiles,
+      history: newHistory,
+      future: [],
+      canUndo: newHistory.length > 0,
+      canRedo: false,
+      openTabs: openTabs.includes(filename) ? openTabs : [...openTabs, filename],
+      selectedFile: filename,
+    });
+  },
+
+  deleteFile(filename) {
+    const { files, openTabs, selectedFile, history } = get();
+    const newFiles = { ...files };
+    delete newFiles[filename];
+
+    const newHistory = [...history, files].slice(-30);
+    const newTabs = openTabs.filter((t) => t !== filename && newFiles[t] !== undefined);
+    let nextSelected = selectedFile;
+
+    if (selectedFile === filename || newFiles[selectedFile] === undefined) {
+      nextSelected = newTabs.length > 0 ? newTabs[newTabs.length - 1] : "";
+    }
+
+    set({
+      files: newFiles,
+      history: newHistory,
+      future: [],
+      canUndo: newHistory.length > 0,
+      canRedo: false,
+      openTabs: newTabs,
+      selectedFile: nextSelected,
+    });
+  },
+
+  renameFile(oldFilename, newFilename) {
+    if (!newFilename || oldFilename === newFilename) return;
+
+    const { files, openTabs, selectedFile, history } = get();
+    if (files[newFilename]) return;
+
+    const content = files[oldFilename];
+    const newFiles = { ...files };
+    delete newFiles[oldFilename];
+    newFiles[newFilename] = content;
+
+    const newHistory = [...history, files].slice(-30);
+    const newTabs = openTabs.map((t) => (t === oldFilename ? newFilename : t));
+    const nextSelected = selectedFile === oldFilename ? newFilename : selectedFile;
+
+    set({
+      files: newFiles,
+      history: newHistory,
+      future: [],
+      canUndo: newHistory.length > 0,
+      canRedo: false,
+      openTabs: newTabs,
+      selectedFile: nextSelected,
+    });
+  },
 }));

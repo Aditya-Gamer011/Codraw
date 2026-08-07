@@ -83,7 +83,6 @@ export async function POST(req: Request) {
         name,
         private: Boolean(body.private),
         auto_init: true,
-        description: "Created with Codraw",
       }),
     });
 
@@ -93,7 +92,7 @@ export async function POST(req: Request) {
       repo.name,
       repo.default_branch,
       body.files,
-      "Create website from Codraw"
+      "Initial commit"
     );
 
     return NextResponse.json({

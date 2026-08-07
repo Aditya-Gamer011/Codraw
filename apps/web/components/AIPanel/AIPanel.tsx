@@ -1,24 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { BrainCircuit, Sparkles, Zap } from "lucide-react";
+import CustomModal, { ModalState } from "@/components/Modal/CustomModal";
 
 import {
   isValidProject,
   parseProject,
 } from "@/lib/parseProject";
 import { useEditorStore } from "@/lib/editorStore";
+import { ProjectFiles } from "@/lib/types";
 
 const modelOptions = [
-  { id: "lightning", label: "Lightning" },
-  { id: "balanced", label: "Balanced" },
-  { id: "hardcore", label: "Hardcore" },
+  { id: "fast", label: "Fast", icon: Zap, activeColor: "bg-amber-500/20 border-amber-500/50 text-amber-400" },
+  { id: "smart", label: "Balanced", icon: Sparkles, activeColor: "bg-sky-500/20 border-sky-500/50 text-sky-400" },
+  { id: "deep", label: "Deep", icon: BrainCircuit, activeColor: "bg-purple-500/20 border-purple-500/50 text-purple-400" },
 ] as const;
 
 type ModelMode = (typeof modelOptions)[number]["id"];
 
 type Props = {
-  onClose: () => void;
+  onClose?: () => void;
+  onAiSuccess?: (previousFiles: ProjectFiles) => void;
 };
 
 const placeholders = [
@@ -46,20 +49,32 @@ const placeholders = [
 
 export default function AIPanel({
   onClose,
+  onAiSuccess,
 }: Props) {
   const files = useEditorStore((s) => s.files);
   const setFiles = useEditorStore((s) => s.setFiles);
+  const openFile = useEditorStore((s) => s.openFile);
 
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [modelMode, setModelMode] =
-    useState<ModelMode>("lightning");
+    useState<ModelMode>("fast");
+
+  const [modalState, setModalState] = useState<ModalState | null>(null);
+
+  function requestAlert(title: string, description: string) {
+    setModalState({
+      isOpen: true,
+      mode: "alert",
+      title,
+      description,
+      icon: "alert",
+      variant: "danger",
+    });
+  }
 
   const [placeholder] = useState(
-    () =>
-      placeholders[
-        Math.floor(Math.random() * placeholders.length)
-      ]
+    () => placeholders[Math.floor(Math.random() * placeholders.length)]
   );
 
   async function generateWebsite() {
@@ -83,71 +98,75 @@ export default function AIPanel({
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "API Error");
+        requestAlert("Generation Error", data.error || "AI provider returned an error.");
         return;
       }
 
-      const updatedFiles = parseProject(data.html);
+      const updatedFiles = parseProject(data, files);
 
       if (!isValidProject(updatedFiles)) {
         console.error("Invalid AI response:", data.html);
-        alert(
-          "The AI returned an invalid project. Please try again."
+        requestAlert(
+          "Invalid Project Response",
+          "The AI returned an invalid project structure. Please try again."
         );
         return;
       }
 
+      const previousSnapshot = { ...files };
       setFiles(updatedFiles);
+      if (onAiSuccess) {
+        onAiSuccess(previousSnapshot);
+      }
+      Object.keys(updatedFiles).forEach((filename) => {
+        openFile(filename);
+      });
+      openFile("index.html");
       setPrompt("");
     } catch (err) {
       console.error(err);
-      alert("Failed to generate website.");
+      requestAlert("Connection Error", "Failed to generate website. Please check your connection.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="sleek-panel flex h-full flex-col border-l text-zinc-100">
+    <div className="sleek-panel animate-slideInRight flex h-full flex-col border-l text-zinc-100">
       <div className="border-b border-zinc-800 p-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-white">
-              AI Assistant
-            </h2>
+        <div>
+          <h2 className="text-lg font-semibold text-white">
+            AI Assistant
+          </h2>
 
-            <p className="mt-1 text-sm text-zinc-500">
-              Describe what you&apos;d like to build or improve.
-            </p>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="sleek-button grid h-8 w-8 place-items-center rounded transition hover:bg-red-500/10 hover:text-red-400"
-            title="Close AI Assistant"
-          >
-            <X size={16} />
-          </button>
+          <p className="mt-1 text-sm text-zinc-500">
+            Describe what you&apos;d like to build or improve.
+          </p>
         </div>
       </div>
 
       <div className="flex flex-1 flex-col gap-4 p-4">
-        <div className="sleek-panel-soft grid grid-cols-3 overflow-hidden rounded border p-1">
-          {modelOptions.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              disabled={loading}
-              onClick={() => setModelMode(option.id)}
-              className={`h-8 text-xs font-medium transition ${
-                modelMode === option.id
-                  ? "rounded bg-blue-600 text-white"
-                  : "text-zinc-500 hover:text-white"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className="sleek-panel-soft grid grid-cols-3 gap-1.5 rounded-lg border border-zinc-800 p-1 bg-zinc-950/60">
+          {modelOptions.map((option) => {
+            const Icon = option.icon;
+            const isSelected = modelMode === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                disabled={loading}
+                onClick={() => setModelMode(option.id)}
+                className={`flex h-8 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition-all ${
+                  isSelected
+                    ? `${option.activeColor} shadow-sm`
+                    : "border-transparent text-zinc-400 hover:bg-zinc-800/60 hover:text-white"
+                }`}
+              >
+                <Icon size={13} />
+                <span>{option.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         <textarea
@@ -191,6 +210,8 @@ export default function AIPanel({
           )}
         </button>
       </div>
+
+      <CustomModal modal={modalState} onClose={() => setModalState(null)} />
     </div>
   );
 }

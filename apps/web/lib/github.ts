@@ -77,7 +77,7 @@ export async function githubFetch<T>(
   return (await response.json()) as T;
 }
 
-function encodeFile(content: string) {
+export function encodeFile(content: string) {
   return Buffer.from(content, "utf8").toString("base64");
 }
 
@@ -85,7 +85,7 @@ function encodeRepoPath(path: string) {
   return path.split("/").map(encodeURIComponent).join("/");
 }
 
-async function getExistingFileSha(
+export async function getExistingFileSha(
   token: string,
   owner: string,
   repo: string,
@@ -124,29 +124,86 @@ export async function writeProjectFiles(
   files: ProjectFiles,
   message: string
 ) {
-  for (const path of Object.keys(files) as (keyof ProjectFiles)[]) {
-    const sha = await getExistingFileSha(
-      token,
-      owner,
-      repo,
-      path,
-      branch
-    );
+  // 1. Get current branch HEAD commit
+  const ref = await githubFetch<GitHubRef>(
+    token,
+    `/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`
+  );
+  const latestCommitSha = ref.object.sha;
 
-    await githubFetch(
+  // 2. Get latest commit's tree SHA
+  const latestCommit = await githubFetch<{ tree: { sha: string } }>(
+    token,
+    `/repos/${owner}/${repo}/git/commits/${latestCommitSha}`
+  );
+  const baseTreeSha = latestCommit.tree.sha;
+
+  // 3. Create blob objects for all files
+  const treeItems = [];
+  for (const [path, content] of Object.entries(files)) {
+    const isBinaryDataUrl = typeof content === "string" && content.startsWith("data:") && content.includes(";base64,");
+    const blobContent = isBinaryDataUrl ? content.split(";base64,")[1] : content;
+    const encoding = isBinaryDataUrl ? "base64" : "utf-8";
+
+    const blob = await githubFetch<{ sha: string }>(
       token,
-      `/repos/${owner}/${repo}/contents/${encodeRepoPath(path)}`,
+      `/repos/${owner}/${repo}/git/blobs`,
       {
-        method: "PUT",
+        method: "POST",
         body: JSON.stringify({
-          message,
-          content: encodeFile(files[path]),
-          branch,
-          ...(sha ? { sha } : {}),
+          content: blobContent,
+          encoding,
         }),
       }
     );
+
+    treeItems.push({
+      path,
+      mode: "100644",
+      type: "blob",
+      sha: blob.sha,
+    });
   }
+
+  // 4. Create new tree referencing baseTreeSha
+  const newTree = await githubFetch<{ sha: string }>(
+    token,
+    `/repos/${owner}/${repo}/git/trees`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        base_tree: baseTreeSha,
+        tree: treeItems,
+      }),
+    }
+  );
+
+  // 5. Create 1 single commit
+  const newCommit = await githubFetch<{ sha: string }>(
+    token,
+    `/repos/${owner}/${repo}/git/commits`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        message,
+        tree: newTree.sha,
+        parents: [latestCommitSha],
+      }),
+    }
+  );
+
+  // 6. Update branch head to new commit
+  await githubFetch(
+    token,
+    `/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        sha: newCommit.sha,
+        force: false,
+      }),
+    }
+  );
 }
 
 export async function getRepo(

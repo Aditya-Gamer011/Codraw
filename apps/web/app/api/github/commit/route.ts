@@ -34,7 +34,7 @@ export async function POST(req: Request) {
       body.repo,
       repo.default_branch,
       body.files,
-      body.message ?? "Update website from Codraw"
+      body.message ?? "Update website"
     );
 
     return NextResponse.json({

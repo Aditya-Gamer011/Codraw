@@ -6,75 +6,56 @@ const ai = new GoogleGenAI({
 });
 
 const modelByMode = {
-  lightning: "gemini-3.5-flash-lite",
-  balanced: "gemini-3.6-flash",
-  hardcore: "gemini-3.1-pro-preview",
+  fast: "gemini-3.1-flash-lite",
+  smart: "gemini-3.5-flash",
+  deep: "gemini-3.6-flash",
 } as const;
 
 type ModelMode = keyof typeof modelByMode;
 
-const maxAttempts = 3;
+const FALLBACK_MODELS = [
+  "gemini-3.1-flash-lite",
+  "gemini-3.5-flash-lite",
+  "gemini-3.5-flash",
+  "gemini-3.6-flash",
+  "gemini-3-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-flash",
+];
 
-function getModel(mode: unknown) {
-  if (
-    typeof mode === "string" &&
-    mode in modelByMode
-  ) {
+function getPreferredModel(mode: unknown) {
+  if (typeof mode === "string" && mode in modelByMode) {
     return modelByMode[mode as ModelMode];
   }
-
-  return process.env.GEMINI_MODEL ?? modelByMode.lightning;
+  return process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite";
 }
 
-function isTransientError(error: unknown) {
-  const message =
-    error instanceof Error ? error.message : String(error);
-  const cause =
-    error instanceof Error && "cause" in error
-      ? String(error.cause)
-      : "";
-  const text = `${message} ${cause}`.toLowerCase();
-
-  return (
-    text.includes("fetch failed") ||
-    text.includes("econnreset") ||
-    text.includes("etimedout") ||
-    text.includes("temporarily unavailable") ||
-    text.includes("503") ||
-    text.includes("502") ||
-    text.includes("429")
+async function generateWithFallback(contents: string, preferredModel: string) {
+  const modelsToTry = Array.from(
+    new Set([preferredModel, ...FALLBACK_MODELS])
   );
-}
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
-async function generateWithRetry(
-  contents: string,
-  model: string
-) {
   let lastError: unknown;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      return await ai.models.generateContent({
-        model,
-        contents,
-      });
-    } catch (error) {
-      lastError = error;
-
-      if (
-        attempt === maxAttempts ||
-        !isTransientError(error)
-      ) {
-        throw error;
+  for (const model of modelsToTry) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents,
+          config: {
+            responseMimeType: "application/json",
+          },
+        });
+        if (response && response.text) {
+          return response;
+        }
+      } catch (err) {
+        lastError = err;
+        console.warn(`Model ${model} attempt ${attempt} failed:`, err instanceof Error ? err.message : String(err));
+        // Short pause before retry/fallback
+        await new Promise((r) => setTimeout(r, 300 * attempt));
       }
-
-      await new Promise((resolve) =>
-        setTimeout(resolve, attempt * 750)
-      );
     }
   }
 
@@ -83,82 +64,71 @@ async function generateWithRetry(
 
 export async function POST(req: Request) {
   try {
+    const { prompt, files, modelMode } = await req.json();
+
+    if (!prompt) {
+      return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
+    }
+
     if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json(
-        {
-          error:
-            "Missing GEMINI_API_KEY. Add it to apps/web/.env.local and restart the dev server.",
-        },
-        {
-          status: 500,
-        }
+        { error: "GEMINI_API_KEY is not configured on server." },
+        { status: 500 }
       );
     }
 
-    const body = await req.json();
+    const preferredModel = getPreferredModel(modelMode);
 
-    const prompt = body.prompt;
-    const files = body.files;
-    const model = getModel(body.modelMode);
+    const systemPrompt = `You are CoDraw AI, an elite modular full-stack web developer and designer.
+Generate or edit clean, modern, responsive web applications split into THREE separate modular linked files:
+1. "html": "Clean HTML5 index.html referencing <link rel="stylesheet" href="style.css"> in <head> and <script src="script.js"></script> before </body>."
+2. "css": "All CSS styles, color tokens, animations, layout styles, and responsive media queries for style.css."
+3. "js": "All interactive JavaScript logic, event listeners, dynamic UI state, and behavior for script.js."
 
-    if (!prompt || !files) {
-      return NextResponse.json(
-        {
-          error: "Missing prompt or project files.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
+Return ONLY a valid JSON object matching this schema:
+{
+  "html": "<full index.html code>",
+  "css": "<full style.css code>",
+  "js": "<full script.js code>"
+}
 
-    const project =
-`=== index.html ===
-${files["index.html"]}
+Do not include markdown code block formatting like \`\`\`json in your response if possible, but if you do, ensure the JSON inside is parseable.`;
 
-=== style.css ===
-${files["style.css"]}
+    const contextMessage = files && Object.keys(files).length > 0
+      ? `Existing Project Files:\n${JSON.stringify(files, null, 2)}\n\nUser Request: ${prompt}`
+      : `User Request: ${prompt}`;
 
-=== script.js ===
-${files["script.js"]}`;
-
-    const response = await generateWithRetry(
-      `Edit this website.
-
-Current files:
-${project}
-
-User request:
-${prompt}
-
-Return only these three complete files, with these exact headers:
-=== index.html ===
-...
-=== style.css ===
-...
-=== script.js ===
-...
-
-Rules: preserve unrelated code, use only HTML/CSS/vanilla JS, no markdown, no extra text.`,
-      model
+    const response = await generateWithFallback(
+      `${systemPrompt}\n\n${contextMessage}`,
+      preferredModel
     );
 
-    return NextResponse.json({
-      html: response.text,
-    });
-  } catch (error) {
-    console.error(error);
+    const rawText = response.text || "";
 
+    // Clean markdown formatting if present
+    const cleanedText = rawText
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+
+    try {
+      const parsed = JSON.parse(cleanedText);
+      return NextResponse.json(parsed);
+    } catch {
+      // If AI returned raw HTML instead of JSON
+      return NextResponse.json({
+        html: rawText,
+      });
+    }
+  } catch (error: unknown) {
+    console.error("Gemini API error:", error);
+    const errMessage = error instanceof Error ? error.message : "The AI provider connection was interrupted. Please try again in a moment.";
     return NextResponse.json(
       {
-        error:
-          isTransientError(error)
-            ? "The AI provider connection was interrupted. Please try again in a moment."
-            : getErrorMessage(error),
+        error: errMessage,
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }

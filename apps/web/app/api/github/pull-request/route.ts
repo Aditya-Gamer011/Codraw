@@ -47,7 +47,7 @@ export async function POST(req: Request) {
       body.repo,
       branch,
       body.files,
-      body.message ?? "Update website from Codraw"
+      body.message ?? body.title ?? "Update website"
     );
 
     const pullRequest = await githubFetch<PullRequest>(
@@ -56,8 +56,8 @@ export async function POST(req: Request) {
       {
         method: "POST",
         body: JSON.stringify({
-          title: body.title ?? "Update website from Codraw",
-          body: "This PR was created from Codraw.",
+          title: body.title ?? "Update website",
+          body: body.description ?? "",
           head: branch,
           base: repo.default_branch,
         }),

@@ -1,0 +1,25 @@
+name: codraw
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: codraw-app
+    restart: on-failure:5
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./apps/web/.env.local
+    environment:
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: codraw-tunnel
+    restart: on-failure:5
+    network_mode: "host"
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - /home/singh/.cloudflared:/etc/cloudflared:ro

@@ -42,9 +42,13 @@ export async function GET(req: Request) {
     );
   }
 
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  const proto = req.headers.get("x-forwarded-proto") ?? "https";
+  const origin = host ? `${proto}://${host}` : url.origin;
+
   const redirectUri =
     process.env.GITHUB_CALLBACK_URL ??
-    `${url.origin}/api/github/callback`;
+    `${origin}/api/github/callback`;
 
   const tokenResponse = await fetch(
     "https://github.com/login/oauth/access_token",
@@ -83,7 +87,7 @@ export async function GET(req: Request) {
     );
   }
 
-  const response = NextResponse.redirect(url.origin);
+  const response = NextResponse.redirect(origin);
   response.cookies.set(getGitHubCookieName(), token.access_token, {
     httpOnly: true,
     sameSite: "lax",
